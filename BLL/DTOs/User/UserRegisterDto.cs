@@ -11,6 +11,9 @@ public class UserRegisterDto
     [Required, MinLength(6)]
     public string Password { get; set; }
 
+    [Required, Compare(nameof(Password))]
+    public string ConfirmPassword { get; set; }
+
     [Required, MaxLength(100)]
     public string Name { get; set; }
 
