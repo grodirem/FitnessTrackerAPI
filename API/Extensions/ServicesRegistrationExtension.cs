@@ -1,4 +1,6 @@
-﻿using DAL.Interfaces;
+﻿using BLL.Interfaces;
+using BLL.Services;
+using DAL.Interfaces;
 using DAL.Repositories;
 using FluentValidation;
 
@@ -13,7 +15,9 @@ public static class ServicesRegistrationExtension
 
     public static void AddServices(this IServiceCollection services)
     {
-        //
+        services.AddScoped<ITokenService, TokenService>();
+        services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IGoalService, GoalService>();
     }
 
     public static void AddValidators(this IServiceCollection services)
