@@ -1,14 +1,13 @@
-using Microsoft.EntityFrameworkCore;
+using API.Extensions;
 using DAL.Contexts;
 using DAL.Entities;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.OpenApi.Models;
+using LibraryWebApp_v2;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using System.Text;
-using DAL.Interfaces;
-using DAL.Repositories;
-using API.Extensions;
 
 namespace API
 {
@@ -88,7 +87,7 @@ namespace API
             }
 
             app.UseHttpsRedirection();
-
+            app.UseMiddleware<ExceptionHandlingMiddleware>();
             app.UseAuthorization();
 
 

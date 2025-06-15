@@ -17,7 +17,11 @@ public static class ServicesRegistrationExtension
     {
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IUserService, UserService>();
         services.AddScoped<IGoalService, GoalService>();
+        services.AddScoped<IWorkoutService, WorkoutService>();
+        services.AddScoped<IStatisticsService, StatisticsService>();
+        services.AddScoped<IIntegrationService, IntegrationService>();
     }
 
     public static void AddValidators(this IServiceCollection services)
