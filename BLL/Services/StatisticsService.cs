@@ -1,10 +1,10 @@
-﻿using AutoMapper;
-using BLL.DTOs.Statistics;
+﻿using BLL.DTOs.Statistics;
 using BLL.Exceptions;
 using BLL.Interfaces;
 using Common.Enums;
 using DAL.Contexts;
 using DAL.Entities;
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
 namespace BLL.Services;
@@ -12,16 +12,20 @@ namespace BLL.Services;
 public class StatisticsService : IStatisticsService
 {
     private readonly FitnessTrackerContext _context;
-    private readonly IMapper _mapper;
+    private readonly IValidator<StatisticsRequestDto> _validator;
 
-    public StatisticsService(FitnessTrackerContext context, IMapper mapper)
+    public StatisticsService(
+        FitnessTrackerContext context,
+        IValidator<StatisticsRequestDto> validator)
     {
         _context = context;
-        _mapper = mapper;
+        _validator = validator;
     }
 
     public async Task<StatisticsResponseDto> GetUserStatisticsAsync(Guid userId, StatisticsRequestDto requestDto)
     {
+        await _validator.ValidateAndThrowAsync(requestDto);
+
         var workoutsQuery = _context.Workouts
             .Where(w => w.UserId == userId)
             .AsQueryable();
@@ -53,6 +57,8 @@ public class StatisticsService : IStatisticsService
 
     public async Task<StatisticsResponseDto> GetWorkoutTypeStatisticsAsync(Guid userId, StatisticsRequestDto requestDto)
     {
+        await _validator.ValidateAndThrowAsync(requestDto);
+
         var workoutsQuery = _context.Workouts
             .Where(w => w.UserId == userId)
             .AsQueryable();
