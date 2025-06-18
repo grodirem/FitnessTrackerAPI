@@ -1,5 +1,6 @@
 ﻿using AutoMapper;
 using BLL.DTOs.Goal;
+using BLL.Exceptions;
 using BLL.Interfaces;
 using DAL.Entities;
 using DAL.Interfaces;
@@ -30,27 +31,21 @@ public class GoalService : IGoalService
 
     public async Task<GoalResponseDto> SetGoalAsync(Guid userId, GoalSetDto goalDto)
     {
-        var validationResult = await _goalValidator.ValidateAsync(goalDto);
-        if (!validationResult.IsValid)
-        {
-            _logger.LogWarning("Goal validation failed for user {UserId}", userId);
-            throw new ValidationException(validationResult.Errors);
-        }
+        await _goalValidator.ValidateAsync(goalDto);
 
         var existingGoal = await _unitOfWork.Goals.GetUserActiveGoalAsync(userId);
+
         if (existingGoal != null)
         {
-            _logger.LogWarning("User {UserId} already has active goal {GoalId}",
-                userId, existingGoal.Id);
-            throw new InvalidOperationException("User already has an active goal");
+            _logger.LogWarning("User {UserId} already has active goal {GoalId}", userId, existingGoal.Id);
+            throw new ConflictException("User already has an active goal");
         }
 
         var newGoal = _mapper.Map<Goal>(goalDto);
         newGoal.UserId = userId;
         newGoal.Active = true;
 
-        _unitOfWork.Goals.Create(newGoal);
-        await _unitOfWork.SaveChangesAsync();
+        await _unitOfWork.Goals.CreateAndSaveAsync(newGoal);
 
         _logger.LogInformation("Created new goal {GoalId} for user {UserId}",
             newGoal.Id, userId);
@@ -62,28 +57,20 @@ public class GoalService : IGoalService
     {
         var goal = await _unitOfWork.Goals.GetUserActiveGoalAsync(userId);
 
-        if (goal == null)
-        {
-            _logger.LogInformation("No active goal found for user {UserId}", userId);
-            return null;
-        }
+        _logger.LogInformation(goal == null
+            ? "No active goal found for user {UserId}"
+            : "Retrieved active goal {GoalId} for user {UserId}",
+            userId, goal?.Id);
 
         return _mapper.Map<GoalResponseDto>(goal);
     }
 
     public async Task DeactivateGoalAsync(Guid goalId, Guid userId)
     {
-        var goal = await _unitOfWork.Goals.FindByCondition(
-            g => g.Id == goalId && g.UserId == userId,
-            trackChanges: true)
-            .FirstOrDefaultAsync();
-
-        if (goal == null)
-        {
-            _logger.LogWarning("Goal {GoalId} not found for user {UserId}",
-                goalId, userId);
-            throw new KeyNotFoundException("Goal not found");
-        }
+        var goal = await _unitOfWork.Goals
+            .FindByCondition(g => g.Id == goalId && g.UserId == userId, true)
+            .FirstOrDefaultAsync()
+            ?? throw new NotFoundException($"Goal {goalId} not found for user {userId}");
 
         if (!goal.Active)
         {
@@ -92,8 +79,7 @@ public class GoalService : IGoalService
         }
 
         goal.Active = false;
-        _unitOfWork.Goals.Update(goal);
-        await _unitOfWork.SaveChangesAsync();
+        await _unitOfWork.Goals.UpdateAndSaveAsync(goal);
 
         _logger.LogInformation("Deactivated goal {GoalId} for user {UserId}",
             goalId, userId);

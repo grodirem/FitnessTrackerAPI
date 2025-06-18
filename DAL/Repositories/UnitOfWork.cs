@@ -9,9 +9,11 @@ public class UnitOfWork : IUnitOfWork
     private IWorkoutRepository? _workoutRepository;
     private IGoalRepository? _goalRepository;
 
-    public UnitOfWork(FitnessTrackerContext context)
+    public UnitOfWork(FitnessTrackerContext context, IWorkoutRepository workoutRepository, IGoalRepository goalRepository)
     {
         _context = context;
+        _goalRepository = goalRepository;
+        _workoutRepository = workoutRepository;
     }
 
     public IWorkoutRepository Workouts =>
