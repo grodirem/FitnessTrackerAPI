@@ -2,6 +2,7 @@
 using BLL.DTOs.Goal;
 using BLL.Exceptions;
 using BLL.Interfaces;
+using DAL.Contexts;
 using DAL.Entities;
 using DAL.Interfaces;
 using FluentValidation;
@@ -12,28 +13,28 @@ namespace BLL.Services;
 
 public class GoalService : IGoalService
 {
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IGoalRepository _goalRepository;
     private readonly ILogger<GoalService> _logger;
     private readonly IMapper _mapper;
     private readonly IValidator<GoalSetDto> _goalValidator;
 
     public GoalService(
-        IUnitOfWork unitOfWork,
+        IGoalRepository goalRepository,
         ILogger<GoalService> logger,
         IMapper mapper,
         IValidator<GoalSetDto> goalValidator)
     {
-        _unitOfWork = unitOfWork;
+        _goalRepository = goalRepository;
         _logger = logger;
         _mapper = mapper;
         _goalValidator = goalValidator;
     }
 
-    public async Task<GoalResponseDto> SetGoalAsync(Guid userId, GoalSetDto goalDto)
+    public async Task<GoalResponseDto> SetGoalAsync(Guid userId, GoalSetDto goalDto, CancellationToken cancellationToken = default)
     {
-        await _goalValidator.ValidateAsync(goalDto);
+        await _goalValidator.ValidateAsync(goalDto, cancellationToken);
 
-        var existingGoal = await _unitOfWork.Goals.GetUserActiveGoalAsync(userId);
+        var existingGoal = await _goalRepository.GetUserActiveGoalAsync(userId, cancellationToken: cancellationToken);
 
         if (existingGoal != null)
         {
@@ -45,7 +46,7 @@ public class GoalService : IGoalService
         newGoal.UserId = userId;
         newGoal.Active = true;
 
-        await _unitOfWork.Goals.CreateAndSaveAsync(newGoal);
+        await _goalRepository.CreateAndSaveAsync(newGoal, cancellationToken);
 
         _logger.LogInformation("Created new goal {GoalId} for user {UserId}",
             newGoal.Id, userId);
@@ -53,9 +54,9 @@ public class GoalService : IGoalService
         return _mapper.Map<GoalResponseDto>(newGoal);
     }
 
-    public async Task<GoalResponseDto?> GetCurrentGoalAsync(Guid userId)
+    public async Task<GoalResponseDto?> GetCurrentGoalAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var goal = await _unitOfWork.Goals.GetUserActiveGoalAsync(userId);
+        var goal = await _goalRepository.GetUserActiveGoalAsync(userId, cancellationToken: cancellationToken);
 
         _logger.LogInformation(goal == null
             ? "No active goal found for user {UserId}"
@@ -65,11 +66,10 @@ public class GoalService : IGoalService
         return _mapper.Map<GoalResponseDto>(goal);
     }
 
-    public async Task DeactivateGoalAsync(Guid goalId, Guid userId)
+    public async Task DeactivateGoalAsync(Guid goalId, Guid userId, CancellationToken cancellationToken = default)
     {
-        var goal = await _unitOfWork.Goals
-            .FindByCondition(g => g.Id == goalId && g.UserId == userId, true)
-            .FirstOrDefaultAsync()
+        var goal = await _goalRepository
+            .FindFirstByConditionAsync(g => g.Id == goalId && g.UserId == userId, true, cancellationToken)
             ?? throw new NotFoundException($"Goal {goalId} not found for user {userId}");
 
         if (!goal.Active)
@@ -79,7 +79,7 @@ public class GoalService : IGoalService
         }
 
         goal.Active = false;
-        await _unitOfWork.Goals.UpdateAndSaveAsync(goal);
+        await _goalRepository.UpdateAndSaveAsync(goal, cancellationToken);
 
         _logger.LogInformation("Deactivated goal {GoalId} for user {UserId}",
             goalId, userId);

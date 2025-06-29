@@ -4,6 +4,22 @@ namespace BLL.Interfaces;
 
 public interface IStatisticsService
 {
-    Task<StatisticsResponseDto> GetUserStatisticsAsync(Guid userId, StatisticsRequestDto requestDto);
-    Task<StatisticsResponseDto> GetWorkoutTypeStatisticsAsync(Guid userId, StatisticsRequestDto requestDto);
+    Task<int> GetWorkoutsCountAsync(
+       Guid userId,
+       StatisticsRequestDto request,
+       CancellationToken cancellationToken = default);
+
+    Task<StatisticsResponseDto> GetStatisticsAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default);
+
+    Task<CaloriesDynamicResponseDto> GetCaloriesDynamicAsync(
+        Guid userId,
+        StatisticsRequestDto request,
+        CancellationToken cancellationToken = default);
+
+    Task<List<WorkoutTypeCountResponseDto>> GetWorkoutTypeStatsAsync(
+       Guid userId,
+       StatisticsRequestDto request,
+       CancellationToken cancellationToken = default);
 }

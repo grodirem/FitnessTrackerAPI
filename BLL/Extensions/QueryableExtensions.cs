@@ -1,4 +1,5 @@
-﻿using DAL.Entities;
+﻿using Common.Enums;
+using DAL.Entities;
 using System.Linq.Expressions;
 
 namespace BLL.Extensions;
@@ -14,22 +15,25 @@ public static class QueryableExtensions
     }
 
     public static IQueryable<Workout> OrderByField(
-        this IQueryable<Workout> query,
-        string fieldName,
-        bool descending)
+    this IQueryable<Workout> query,
+    SortType? sortBy,
+    bool sortDescending = false)
     {
-        return fieldName switch
+        return sortBy switch
         {
-            "type" => descending
+            SortType.Type => sortDescending
                 ? query.OrderByDescending(w => w.Type)
                 : query.OrderBy(w => w.Type),
-            "duration" => descending
+
+            SortType.Duration => sortDescending
                 ? query.OrderByDescending(w => w.Duration)
                 : query.OrderBy(w => w.Duration),
-            "calories" => descending
+
+            SortType.Calories => sortDescending
                 ? query.OrderByDescending(w => w.Calories)
                 : query.OrderBy(w => w.Calories),
-            _ => descending
+
+            _ => sortDescending 
                 ? query.OrderByDescending(w => w.Date)
                 : query.OrderBy(w => w.Date)
         };

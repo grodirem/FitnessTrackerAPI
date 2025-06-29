@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
+using System.Text.Json.Serialization;
 
 namespace API;
 
@@ -22,7 +23,7 @@ public class Program
         builder.Services.AddDbContext<FitnessTrackerContext>(options => 
             options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-        builder.Services.AddIdentity<User, IdentityRole>()
+        builder.Services.AddIdentity<User, IdentityRole<Guid>>()
             .AddEntityFrameworkStores<FitnessTrackerContext>()
             .AddDefaultTokenProviders();
 
@@ -74,14 +75,18 @@ public class Program
             };
         });
 
-        builder.Services.AddControllers();
+        builder.Services.AddControllers()
+            .AddJsonOptions(options =>
+            {
+                options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+            });
+
         builder.Services.AddRepositories();
         builder.Services.AddServices();
         builder.Services.AddValidators();
 
         var app = builder.Build();
 
-        // Configure the HTTP request pipeline.
         if (app.Environment.IsDevelopment())
         {
             app.UseSwagger();
@@ -89,7 +94,9 @@ public class Program
         }
 
         app.UseHttpsRedirection();
+        app.UseStaticFiles();
         app.UseMiddleware<ExceptionHandlingMiddleware>();
+        app.UseAuthentication();
         app.UseAuthorization();
 
 

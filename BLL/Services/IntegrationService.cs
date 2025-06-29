@@ -1,9 +1,11 @@
 ﻿using AutoMapper;
-using BLL.DTOs.Workout;
+using BLL.DTOs.Integration;
+using BLL.Interfaces;
 using Common.Enums;
 using DAL.Contexts;
-using BLL.Interfaces;
-using System.Data.Entity;
+using FluentValidation;
+using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace BLL.Services
 {
@@ -12,27 +14,35 @@ namespace BLL.Services
         private readonly FitnessTrackerContext _context;
         private readonly IMapper _mapper;
         private readonly IWorkoutService _workoutService;
-        private readonly Random _random = new Random();
+        private readonly IValidator<ExternalWorkoutDto> _validator;
+        private readonly Random _random = new();
 
         public IntegrationService(
             FitnessTrackerContext context,
             IMapper mapper,
-            IWorkoutService workoutService)
+            IWorkoutService workoutService,
+            IValidator<ExternalWorkoutDto> validator)
         {
             _context = context;
             _mapper = mapper;
             _workoutService = workoutService;
+            _validator = validator;
         }
 
-        public async Task ImportWorkoutsFromExternalServiceAsync(Guid userId, IntegrationSourceType serviceType)
+        public async Task ImportWorkoutsFromExternalServiceAsync(
+            Guid userId,
+            IntegrationSourceType serviceType,
+            CancellationToken cancellationToken = default)
         {
-            var mockWorkouts = GenerateMockWorkouts(userId, serviceType);
+            var mockWorkouts = GenerateMockWorkouts(serviceType);
 
             foreach (var workoutDto in mockWorkouts)
             {
                 try
                 {
-                    await _workoutService.CreateWorkoutAsync(userId, workoutDto);
+                    await _validator.ValidateAndThrowAsync(workoutDto, cancellationToken);
+                    await _workoutService.CreateWorkoutFromIntegrationAsync(
+                        userId, workoutDto, cancellationToken);
                 }
                 catch (Exception ex)
                 {
@@ -41,80 +51,106 @@ namespace BLL.Services
             }
         }
 
-        public async Task SyncWithExternalServiceAsync(Guid userId, IntegrationSourceType serviceType)
+        public async Task SyncWithExternalServiceAsync(
+            Guid userId,
+            IntegrationSourceType serviceType,
+            CancellationToken cancellationToken = default)
         {
-            var localWorkouts = await _context.Workouts
-                .Where(w => w.UserId == userId)
-                .OrderByDescending(w => w.Date)
-                .Take(10)
-                .ToListAsync();
+            var settings = await GetUserIntegrationSettingsAsync(userId);
 
-            var externalWorkouts = GenerateMockWorkouts(userId, serviceType);
-
-            foreach (var externalWorkout in externalWorkouts)
+            if ((serviceType == IntegrationSourceType.GoogleFit && !settings.GoogleFitEnabled) ||
+                (serviceType == IntegrationSourceType.AppleHealth && !settings.AppleHealthEnabled))
             {
-                var exists = localWorkouts.Any(w =>
-                    Math.Abs((w.Date - externalWorkout.Date).TotalMinutes) < 5 &&
-                    w.Type == externalWorkout.Type);
+                throw new InvalidOperationException($"Integration with {serviceType} is disabled");
+            }
 
+            var lastSyncDate = settings.LastSyncDate ?? DateTime.UtcNow.AddDays(-7);
+            var newWorkouts = GenerateMockWorkouts(serviceType)
+                .Where(w => w.StartTime > lastSyncDate)
+                .ToList();
+
+            foreach (var workoutDto in newWorkouts)
+            {
+                var exists = await CheckIfWorkoutExistsAsync(userId, workoutDto, cancellationToken);
                 if (!exists)
                 {
-                    await _workoutService.CreateWorkoutAsync(userId, externalWorkout);
+                    await _workoutService.CreateWorkoutFromIntegrationAsync(
+                        userId, workoutDto, cancellationToken);
                 }
             }
+
+            settings.LastSyncDate = DateTime.UtcNow;
+            await UpdateUserIntegrationSettingsAsync(userId, settings);
         }
 
-        private List<WorkoutCreateDto> GenerateMockWorkouts(Guid userId, IntegrationSourceType serviceType)
+        private async Task<bool> CheckIfWorkoutExistsAsync(
+            Guid userId,
+            ExternalWorkoutDto workoutDto,
+            CancellationToken cancellationToken)
         {
-            var mockWorkouts = new List<WorkoutCreateDto>();
+            return await _context.Workouts
+                .AnyAsync(w => w.UserId == userId &&
+                             w.Type == workoutDto.Type &&
+                             Math.Abs((w.Date - workoutDto.StartTime.Date).TotalDays) < 1 &&
+                             Math.Abs(w.Duration - workoutDto.Duration) < 10,
+                    cancellationToken);
+        }
+
+        private List<ExternalWorkoutDto> GenerateMockWorkouts(IntegrationSourceType serviceType)
+        {
+            var mockWorkouts = new List<ExternalWorkoutDto>();
             var workoutTypes = Enum.GetValues(typeof(WorkoutType));
             var daysToGenerate = 30;
 
             for (int i = 0; i < 15; i++)
             {
-                var workoutType = (WorkoutType)workoutTypes.GetValue(_random.Next(workoutTypes.Length));
+                var workoutType = (WorkoutType)workoutTypes.GetValue(_random.Next(workoutTypes.Length))!;
                 var daysAgo = _random.Next(1, daysToGenerate);
-                var workoutDate = DateTime.UtcNow.AddDays(-daysAgo);
+                var startTime = DateTime.UtcNow.AddDays(-daysAgo);
+                var endTime = startTime.AddMinutes(_random.Next(10, 120));
 
-                mockWorkouts.Add(new WorkoutCreateDto
+                mockWorkouts.Add(new ExternalWorkoutDto
                 {
                     Type = workoutType,
-                    Duration = _random.Next(10, 120),
+                    Duration = (int)(endTime - startTime).TotalMinutes,
                     Calories = _random.Next(100, 800),
                     Distance = workoutType == WorkoutType.Running || workoutType == WorkoutType.Cycling
                         ? _random.Next(1, 20)
                         : null,
-                    Date = workoutDate,
-                    Notes = $"Imported from {serviceType} on {DateTime.UtcNow:yyyy-MM-dd}"
-                });
-            }
-
-            if (serviceType == IntegrationSourceType.GoogleFit)
-            {
-                mockWorkouts.Add(new WorkoutCreateDto
-                {
-                    Type = WorkoutType.Walking,
-                    Duration = 45,
-                    Calories = 250,
-                    Distance = 3.5,
-                    Date = DateTime.UtcNow.AddDays(-1),
-                    Notes = "Google Fit automatic tracking"
-                });
-            }
-            else if (serviceType == IntegrationSourceType.AppleHealth)
-            {
-                mockWorkouts.Add(new WorkoutCreateDto
-                {
-                    Type = WorkoutType.Running,
-                    Duration = 30,
-                    Calories = 300,
-                    Distance = 5.0,
-                    Date = DateTime.UtcNow.AddDays(-2),
-                    Notes = "Apple Health recorded workout"
+                    StartTime = startTime,
+                    EndTime = endTime,
+                    Source = serviceType,
+                    Notes = $"Mock data from {serviceType}"
                 });
             }
 
             return mockWorkouts;
+        }
+
+        public async Task<IntegrationSettingsDto> GetUserIntegrationSettingsAsync(Guid userId)
+        {
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user?.IntegrationSettingsJson == null)
+                return new IntegrationSettingsDto();
+
+            return JsonSerializer.Deserialize<IntegrationSettingsDto>(user.IntegrationSettingsJson)
+                   ?? new IntegrationSettingsDto();
+        }
+
+        public async Task UpdateUserIntegrationSettingsAsync(
+            Guid userId,
+            IntegrationSettingsDto settings)
+        {
+            var user = await _context.Users
+                .FirstOrDefaultAsync(u => u.Id == userId);
+
+            if (user == null)
+                throw new KeyNotFoundException("User not found");
+
+            user.IntegrationSettingsJson = JsonSerializer.Serialize(settings);
+            await _context.SaveChangesAsync();
         }
     }
 }

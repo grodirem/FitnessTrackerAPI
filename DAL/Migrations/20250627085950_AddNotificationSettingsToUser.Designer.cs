@@ -9,11 +9,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace DAL.Data.Migrations
+namespace DAL.Migrations
 {
     [DbContext(typeof(FitnessTrackerContext))]
-    [Migration("20250611113728_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20250627085950_AddNotificationSettingsToUser")]
+    partial class AddNotificationSettingsToUser
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -50,30 +50,6 @@ namespace DAL.Data.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Goals");
-                });
-
-            modelBuilder.Entity("DAL.Entities.RefreshToken", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("Expires")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Token")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId")
-                        .IsUnique();
-
-                    b.ToTable("RefreshTokens");
                 });
 
             modelBuilder.Entity("DAL.Entities.User", b =>
@@ -126,6 +102,10 @@ namespace DAL.Data.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
 
+                    b.Property<string>("NotificationSettingsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("PasswordHash")
                         .HasColumnType("nvarchar(max)");
 
@@ -134,6 +114,12 @@ namespace DAL.Data.Migrations
 
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("bit");
+
+                    b.Property<string>("RefreshToken")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("RefreshTokenExpiryTime")
+                        .HasColumnType("datetime2");
 
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("nvarchar(max)");
@@ -222,6 +208,15 @@ namespace DAL.Data.Migrations
                         .HasFilter("[NormalizedName] IS NOT NULL");
 
                     b.ToTable("AspNetRoles", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("2d85df66-cdcb-428d-b1bd-59082fb0e8d6"),
+                            ConcurrencyStamp = "5c58b6c7-89b1-4628-9c1e-70d7863c29e5",
+                            Name = "User",
+                            NormalizedName = "USER"
+                        });
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
@@ -338,17 +333,6 @@ namespace DAL.Data.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("DAL.Entities.RefreshToken", b =>
-                {
-                    b.HasOne("DAL.Entities.User", "User")
-                        .WithOne("RefreshToken")
-                        .HasForeignKey("DAL.Entities.RefreshToken", "UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("DAL.Entities.Workout", b =>
                 {
                     b.HasOne("DAL.Entities.User", "User")
@@ -414,9 +398,6 @@ namespace DAL.Data.Migrations
             modelBuilder.Entity("DAL.Entities.User", b =>
                 {
                     b.Navigation("Goals");
-
-                    b.Navigation("RefreshToken")
-                        .IsRequired();
 
                     b.Navigation("Workouts");
                 });

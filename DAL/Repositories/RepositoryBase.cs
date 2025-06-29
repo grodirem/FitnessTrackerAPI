@@ -14,49 +14,54 @@ public abstract class RepositoryBase<T> : IRepositoryBase<T> where T : class
         _context = context;
     }
 
-    public IQueryable<T> FindAll(bool trackChanges = false)
+    public async Task<List<T>> FindAllAsync(bool trackChanges = false, CancellationToken cancellationToken = default)
     {
-        if (trackChanges)
-        {
-            return _context.Set<T>();
-        }
-        else
-        {
-            return _context.Set<T>().AsNoTracking();
-        }
+        return trackChanges
+            ? await _context.Set<T>().ToListAsync(cancellationToken)
+            : await _context.Set<T>().AsNoTracking().ToListAsync(cancellationToken);
     }
 
-    public IQueryable<T> FindByCondition(Expression<Func<T, bool>> expression, bool trackChanges = false)
+    public async Task<List<T>> FindByConditionAsync(
+        Expression<Func<T, bool>> expression,
+        bool trackChanges = false,
+        CancellationToken cancellationToken = default)
     {
-        if (trackChanges)
-        {
-            return _context.Set<T>().Where(expression);
-        }
-        else
-        {
-            return _context.Set<T>().Where(expression).AsNoTracking();
-        }
+        return trackChanges
+            ? await _context.Set<T>().Where(expression).ToListAsync(cancellationToken)
+            : await _context.Set<T>().Where(expression).AsNoTracking().ToListAsync(cancellationToken);
+    }
+
+    public async Task<T?> FindFirstByConditionAsync(
+        Expression<Func<T, bool>> expression,
+        bool trackChanges = false,
+        CancellationToken cancellationToken = default)
+    {
+        var query = trackChanges
+            ? _context.Set<T>().Where(expression)
+            : _context.Set<T>().Where(expression).AsNoTracking();
+
+        return await query.FirstOrDefaultAsync(cancellationToken);
     }
 
     public void Create(T entity) => _context.Set<T>().Add(entity);
     public void Update(T entity) => _context.Set<T>().Update(entity);
     public void Delete(T entity) => _context.Set<T>().Remove(entity);
 
-    public async Task CreateAndSaveAsync(T entity)
+    public async Task CreateAndSaveAsync(T entity, CancellationToken cancellationToken = default)
     {
         Create(entity);
-        await SaveChangesAsync();
+        await SaveChangesAsync(cancellationToken);
     }
-    public async Task UpdateAndSaveAsync(T entity)
+    public async Task UpdateAndSaveAsync(T entity, CancellationToken cancellationToken = default)
     {
         Update(entity);
-        await SaveChangesAsync();
+        await SaveChangesAsync(cancellationToken);
     }
 
-    public async Task DeleteAndSaveAsync(T entity)
+    public async Task DeleteAndSaveAsync(T entity, CancellationToken cancellationToken = default)
     {
         Delete(entity);
-        await SaveChangesAsync();
+        await SaveChangesAsync(cancellationToken);
     }
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default)

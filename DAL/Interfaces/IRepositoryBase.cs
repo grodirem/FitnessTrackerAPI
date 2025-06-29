@@ -4,16 +4,27 @@ namespace DAL.Interfaces;
 
 public interface IRepositoryBase<T> where T : class
 {
-    IQueryable<T> FindAll(bool trackChanges = false);
-    IQueryable<T> FindByCondition(Expression<Func<T, bool>> expression, bool trackChanges = false);
+    Task<List<T>> FindAllAsync(
+        bool trackChanges = false, 
+        CancellationToken cancellationToken = default);
+
+    Task<List<T>> FindByConditionAsync(
+        Expression<Func<T, bool>> expression,
+        bool trackChanges = false,
+        CancellationToken cancellationToken = default);
+
+    Task<T?> FindFirstByConditionAsync(
+        Expression<Func<T, bool>> expression,
+        bool trackChanges = false,
+        CancellationToken cancellationToken = default);
 
     void Create(T entity);
     void Update(T entity);
     void Delete(T entity);
 
-    Task CreateAndSaveAsync(T entity);
-    Task UpdateAndSaveAsync(T entity);
-    Task DeleteAndSaveAsync(T entity);
+    Task CreateAndSaveAsync(T entity, CancellationToken cancellationToken = default);
+    Task UpdateAndSaveAsync(T entity, CancellationToken cancellationToken = default);
+    Task DeleteAndSaveAsync(T entity, CancellationToken cancellationToken = default);
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

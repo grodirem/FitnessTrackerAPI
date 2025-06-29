@@ -11,9 +11,5 @@ public class StatisticsRequestDtoValidator : BaseValidator<StatisticsRequestDto>
         {
             RuleFor(x => x.EndDate).GreaterThanOrEqualTo(x => x.StartDate);
         });
-
-        RuleFor(x => x.PeriodType)
-            .IsInEnum()
-            .WithMessage("Invalid period type. Valid values: 'Week', 'Month', 'Year'");
     }
 }
