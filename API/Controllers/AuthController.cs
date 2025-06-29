@@ -1,6 +1,8 @@
 ﻿using API.Extensions;
+using BLL.DTOs.RefreshToken;
 using BLL.DTOs.User;
 using BLL.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace API.Controllers;
@@ -30,7 +32,16 @@ public class AuthController : Controller
         return Ok(result);
     }
 
+    [HttpPost("refresh")]
+    [Authorize]
+    public async Task<IActionResult> Refresh([FromBody] RefreshTokenRequest refreshTokenRequest, CancellationToken cancellationToken)
+    {
+        var result = await _authService.RefreshTokenAsync(refreshTokenRequest, cancellationToken);
+        return Ok(result);
+    }
+
     [HttpPost("logout")]
+    [Authorize]
     public async Task<IActionResult> Logout(CancellationToken cancellationToken = default)
     {
         await _authService.LogoutAsync(User.GetUserId(), cancellationToken);

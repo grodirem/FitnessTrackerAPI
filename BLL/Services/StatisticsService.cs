@@ -22,141 +22,130 @@ public class StatisticsService : IStatisticsService
         _validator = validator;
     }
 
-    public async Task<StatisticsResponseDto> GetUserStatisticsAsync(Guid userId, StatisticsRequestDto requestDto)
+    public async Task<int> GetWorkoutsCountAsync(
+        Guid userId,
+        StatisticsRequestDto request, 
+        CancellationToken cancellationToken = default)
     {
-        await _validator.ValidateAndThrowAsync(requestDto);
+        await _validator.ValidateAndThrowAsync(request, cancellationToken);
 
-        var workoutsQuery = _context.Workouts
-            .Where(w => w.UserId == userId)
-            .AsQueryable();
+        var workoutQuery = _context.Workouts
+            .Where(w => w.UserId == userId);
 
-        workoutsQuery = ApplyDateFilter(workoutsQuery, requestDto);
+        workoutQuery = ApplyDateFilter(workoutQuery, request);
 
-        var workouts = await workoutsQuery.ToListAsync();
-
-        if (!workouts.Any())
+        if (workoutQuery == null)
         {
-            throw new NotFoundException("No workouts found for the specified period");
+            throw new NotFoundException("Not a single workout was found.");
         }
 
-        return new StatisticsResponseDto
-        {
-            TotalWorkouts = workouts.Count,
-            TotalCaloriesBurned = workouts.Sum(w => w.Calories),
-            AverageWorkoutDuration = (int)workouts.Average(w => w.Duration),
-            FavoriteWorkoutType = workouts
-                .GroupBy(w => w.Type)
-                .OrderByDescending(g => g.Count())
-                .First().Key,
-            WorkoutsByPeriod = GroupWorkoutsByPeriod(workouts, requestDto.PeriodType),
-            WorkoutsByType = workouts
-                .GroupBy(w => w.Type)
-                .ToDictionary(g => g.Key, g => g.Count())
-        };
+        return workoutQuery.Count();
     }
 
-    public async Task<StatisticsResponseDto> GetWorkoutTypeStatisticsAsync(Guid userId, StatisticsRequestDto requestDto)
+    public async Task<CaloriesDynamicResponseDto> GetCaloriesDynamicAsync(
+         Guid userId,
+         StatisticsRequestDto request,
+         CancellationToken cancellationToken = default)
     {
-        await _validator.ValidateAndThrowAsync(requestDto);
+        var query = _context.Workouts
+            .Where(w => w.UserId == userId);
 
-        var workoutsQuery = _context.Workouts
-            .Where(w => w.UserId == userId)
-            .AsQueryable();
+        query = ApplyDateFilter(query, request);
 
-        workoutsQuery = ApplyDateFilter(workoutsQuery, requestDto);
-
-        var workouts = await workoutsQuery.ToListAsync();
-
-        if (!workouts.Any())
-        {
-            throw new NotFoundException("No workouts found for the specified period");
-        }
-
-        return new StatisticsResponseDto
-        {
-            TotalWorkouts = workouts.Count,
-            TotalCaloriesBurned = workouts.Sum(w => w.Calories),
-            AverageWorkoutDuration = (int)workouts.Average(w => w.Duration),
-            WorkoutsByType = workouts
-                .GroupBy(w => w.Type)
-                .ToDictionary(g => g.Key, g => g.Count()),
-            WorkoutsByPeriod = GroupWorkoutsByTypeAndPeriod(workouts, requestDto.PeriodType)
-        };
-    }
-
-    private IQueryable<Workout> ApplyDateFilter(IQueryable<Workout> query, StatisticsRequestDto requestDto)
-    {
-        if (requestDto.StartDate.HasValue)
-        {
-            query = query.Where(w => w.Date >= requestDto.StartDate.Value);
-        }
-
-        if (requestDto.EndDate.HasValue)
-        {
-            query = query.Where(w => w.Date <= requestDto.EndDate.Value);
-        }
-
-        return query;
-    }
-
-    private Dictionary<string, int> GroupWorkoutsByPeriod(List<Workout> workouts, PeriodType periodType)
-    {
-        return periodType switch
-        {
-            PeriodType.Day => workouts
-                .GroupBy(w => w.Date.ToString("yyyy-MM-dd"))
-                .ToDictionary(g => g.Key, g => g.Count()),
-
-            PeriodType.Week => workouts
-                .GroupBy(w => $"{w.Date.Year}-W{GetWeekNumber(w.Date)}")
-                .ToDictionary(g => g.Key, g => g.Count()),
-
-            PeriodType.Month => workouts
-                .GroupBy(w => w.Date.ToString("yyyy-MM"))
-                .ToDictionary(g => g.Key, g => g.Count()),
-
-            PeriodType.Year => workouts
-                .GroupBy(w => w.Date.Year.ToString())
-                .ToDictionary(g => g.Key, g => g.Count()),
-
-            _ => throw new ArgumentException("Invalid period type")
-        };
-    }
-
-    private Dictionary<string, int> GroupWorkoutsByTypeAndPeriod(List<Workout> workouts, PeriodType periodType)
-    {
-        var result = new Dictionary<string, int>();
-
-        foreach (var workout in workouts)
-        {
-            var periodKey = periodType switch
+        var dailyCalories = await query
+            .GroupBy(w => w.Date.Date)
+            .Select(g => new CaloriesDynamicDto
             {
-                PeriodType.Day => $"{workout.Type}_{workout.Date:yyyy-MM-dd}",
-                PeriodType.Week => $"{workout.Type}_{workout.Date.Year}-W{GetWeekNumber(workout.Date)}",
-                PeriodType.Month => $"{workout.Type}_{workout.Date:yyyy-MM}",
-                PeriodType.Year => $"{workout.Type}_{workout.Date.Year}",
-                _ => throw new ArgumentException("Invalid period type")
-            };
+                Date = g.Key,
+                Calories = g.Sum(w => w.Calories)
+            })
+            .OrderBy(d => d.Date)
+            .ToListAsync(cancellationToken);
 
-            if (result.ContainsKey(periodKey))
+        var response = new CaloriesDynamicResponseDto
+        {
+            DailyCalories = dailyCalories,
+            TotalCalories = dailyCalories.Sum(d => d.Calories),
+            AverageCaloriesPerDay = dailyCalories.Any()
+                ? dailyCalories.Average(d => d.Calories)
+                : 0
+        };
+
+        return response;
+    }
+
+    public async Task<List<WorkoutTypeCountResponseDto>> GetWorkoutTypeStatsAsync(
+        Guid userId,
+        StatisticsRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _context.Workouts
+            .Where(w => w.UserId == userId);
+
+        query = ApplyDateFilter(query, request);
+
+        var workouts = await query
+            .GroupBy(w => w.Type)
+            .Select(g => new WorkoutTypeCountResponseDto
             {
-                result[periodKey]++;
-            }
-            else
-            {
-                result[periodKey] = 1;
-            }
-        }
+                Type = g.Key,
+                TotalCount = g.Count()
+            })
+            .OrderBy(w => w.Type)
+            .ToListAsync(cancellationToken);
+
+        var allTypes = Enum.GetValues(typeof(WorkoutType)).Cast<WorkoutType>();
+        var result = allTypes.Select(t => new WorkoutTypeCountResponseDto
+        {
+            Type = t,
+            TotalCount = workouts.FirstOrDefault(w => w.Type == t)?.TotalCount ?? 0
+        }).ToList();
 
         return result;
     }
 
-    private static int GetWeekNumber(DateTime date)
+    public async Task<StatisticsResponseDto> GetStatisticsAsync(
+        Guid userId, 
+        CancellationToken cancellationToken = default)
     {
-        var culture = System.Globalization.CultureInfo.CurrentCulture;
-        return culture.Calendar.GetWeekOfYear(
-            date,
-            culture.DateTimeFormat.CalendarWeekRule,
-            culture.DateTimeFormat.FirstDayOfWeek);
+        var workoutsQuery = _context.Workouts
+            .Where(w => w.UserId == userId);
+
+        var totalWorkouts = await workoutsQuery.CountAsync(cancellationToken);
+        var averageWorkoutDuration = (int)await workoutsQuery.AverageAsync(w => w.Duration, cancellationToken);
+        var longestDistance = await workoutsQuery.MaxAsync(w => w.Distance, cancellationToken);
+        var mostCaloriesBurned = await workoutsQuery.MaxAsync(w => w.Calories, cancellationToken);
+
+        var mostFrequentWorkoutType = await workoutsQuery
+            .GroupBy(w => w.Type)
+            .OrderByDescending(g => g.Count())
+            .Select(g => g.Key)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return new StatisticsResponseDto
+        {
+            TotalWorkouts = totalWorkouts,
+            AverageWorkoutDuration = averageWorkoutDuration,
+            LongestDistance = longestDistance,
+            MostCaloriesBurned = mostCaloriesBurned,
+            MostFrequentWorkoutType = mostFrequentWorkoutType
+        };
+    }
+
+    private IQueryable<Workout> ApplyDateFilter(
+        IQueryable<Workout> query,
+        StatisticsRequestDto request)
+    {
+        if (request.StartDate.HasValue)
+        {
+            query = query.Where(w => w.Date >= request.StartDate.Value);
+        }
+
+        if (request.EndDate.HasValue)
+        {
+            query = query.Where(w => w.Date <= request.EndDate.Value);
+        }
+
+        return query;
     }
 }

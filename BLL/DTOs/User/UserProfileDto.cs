@@ -1,4 +1,5 @@
-﻿using Common.Enums;
+﻿using BLL.DTOs.Goal;
+using Common.Enums;
 
 namespace BLL.DTOs.User;
 
@@ -10,4 +11,7 @@ public class UserProfileDto
     public DateTime BirthDate { get; set; }
     public Gender Gender { get; set; }
     public DateTime CreatedAt { get; set; }
+
+    public NotificationSettingsDto NotificationSettings { get; set; } = new();
+    public ICollection<GoalProfileDto> Goals { get; set; } = [];
 }

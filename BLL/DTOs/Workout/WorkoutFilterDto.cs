@@ -11,6 +11,6 @@ public class WorkoutFilterDto
     public int? MaxDuration { get; set; }
     public int? MinCalories { get; set; }
     public int? MaxCalories { get; set; }
-    public string SortBy { get; set; } = "Date";
-    public bool SortDescending { get; set; } = true;
+    public SortType? SortBy { get; set; }
+    public bool? SortDescending { get; set; }
 }

@@ -1,11 +1,13 @@
 ﻿using Common.Enums;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace BLL.DTOs.Workout;
 
 public class WorkoutCreateDto
 {
     [Required]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public WorkoutType Type { get; set; }
 
     [Required, Range(1, 1000)]

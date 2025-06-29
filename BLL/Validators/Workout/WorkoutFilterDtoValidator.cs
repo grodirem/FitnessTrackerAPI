@@ -11,15 +11,5 @@ public class WorkoutFilterDtoValidator : BaseValidator<WorkoutFilterDto>
         {
             RuleFor(x => x.ToDate).GreaterThanOrEqualTo(x => x.FromDate);
         });
-
-        RuleFor(x => x.SortBy).Must(BeValidSortField)
-            .WithMessage("Invalid sort field. Valid values: 'Type', 'Date', 'Duration', 'Calories'");
-    }
-
-    private bool BeValidSortField(string? sortBy)
-    {
-        if (string.IsNullOrEmpty(sortBy)) return true;
-        var validFields = new[] { "Type", "Date", "Duration", "Calories" };
-        return validFields.Contains(sortBy);
     }
 }

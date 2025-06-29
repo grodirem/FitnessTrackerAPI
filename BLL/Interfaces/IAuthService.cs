@@ -1,7 +1,6 @@
 ﻿using BLL.DTOs.Auth;
 using BLL.DTOs.RefreshToken;
 using BLL.DTOs.User;
-using System.Security.Claims;
 
 namespace BLL.Interfaces;
 

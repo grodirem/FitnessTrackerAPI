@@ -1,9 +1,21 @@
-﻿using Common.Enums;
+﻿using BLL.DTOs.Integration;
+using Common.Enums;
 
-namespace BLL.Interfaces;
-
-public interface IIntegrationService
+namespace BLL.Interfaces
 {
-    Task ImportWorkoutsFromExternalServiceAsync(Guid userId, IntegrationSourceType serviceType);
-    Task SyncWithExternalServiceAsync(Guid userId, IntegrationSourceType serviceType);
+    public interface IIntegrationService
+    {
+        Task ImportWorkoutsFromExternalServiceAsync(
+            Guid userId,
+            IntegrationSourceType serviceType,
+            CancellationToken cancellationToken = default);
+
+        Task SyncWithExternalServiceAsync(
+            Guid userId,
+            IntegrationSourceType serviceType,
+            CancellationToken cancellationToken = default);
+
+        Task<IntegrationSettingsDto> GetUserIntegrationSettingsAsync(Guid userId);
+        Task UpdateUserIntegrationSettingsAsync(Guid userId, IntegrationSettingsDto settings);
+    }
 }

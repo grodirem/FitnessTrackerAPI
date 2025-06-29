@@ -9,8 +9,17 @@ public class User : IdentityUser<Guid>
     public DateTime BirthDate { get; set; }
     public Gender Gender { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-     
-    public RefreshToken RefreshToken { get; set; }
+
+    public string? RefreshToken { get; set; }
+    public DateTime? RefreshTokenExpiryTime { get; set; }
+
+    public string NotificationSettingsJson { get; set; }
+        = "{\"WorkoutReminders\":true," +
+        "\"GoalProgressUpdates\":true," +
+        "\"NewsAndAnnouncements\":true," +
+        "\"DailyNotificationTime\":\"19:00\"}";
+
+    public string? IntegrationSettingsJson { get; set; }
 
     public ICollection<Workout> Workouts { get; set; }
     public ICollection<Goal> Goals { get; set; }

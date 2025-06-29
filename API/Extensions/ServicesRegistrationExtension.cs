@@ -1,5 +1,9 @@
 ﻿using BLL.Interfaces;
 using BLL.Services;
+using BLL.Validators.Integration;
+using BLL.Validators.Statistics;
+using BLL.Validators.User;
+using BLL.Validators.Workout;
 using DAL.Interfaces;
 using DAL.Repositories;
 using FluentValidation;
@@ -10,7 +14,8 @@ public static class ServicesRegistrationExtension
 {
     public static void AddRepositories(this IServiceCollection services)
     {
-        services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<IWorkoutRepository, WorkoutRepository>();
+        services.AddScoped<IGoalRepository, GoalRepository>();
     }
 
     public static void AddServices(this IServiceCollection services)
@@ -26,6 +31,11 @@ public static class ServicesRegistrationExtension
 
     public static void AddValidators(this IServiceCollection services)
     {
-        services.AddValidatorsFromAssemblyContaining<Program>();
+        services.AddValidatorsFromAssemblyContaining<UserLoginDtoValidator>();
+        services.AddValidatorsFromAssemblyContaining<UserUpdateDtoValidator>();
+        services.AddValidatorsFromAssemblyContaining<WorkoutCreateDtoValidator>();
+        services.AddValidatorsFromAssemblyContaining<StatisticsRequestDtoValidator>();
+        services.AddValidatorsFromAssemblyContaining<ExternalWorkoutValidator>();
+        services.AddValidatorsFromAssemblyContaining<NotificationSettingsUpdateValidator>();
     }
 }

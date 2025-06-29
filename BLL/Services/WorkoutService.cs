@@ -1,10 +1,11 @@
 ﻿using AutoMapper;
+using BLL.DTOs.Integration;
 using BLL.DTOs.Workout;
 using BLL.Exceptions;
 using BLL.Extensions;
 using BLL.Interfaces;
-using DAL.Contexts;
 using DAL.Entities;
+using DAL.Interfaces;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,43 +13,48 @@ namespace BLL.Services;
 
 public class WorkoutService : IWorkoutService
 {
-    private readonly FitnessTrackerContext _context;
+    private readonly IWorkoutRepository _workoutRepository;
     private readonly IMapper _mapper;
     private readonly IValidator<WorkoutCreateDto> _createValidator;
     private readonly IValidator<WorkoutUpdateDto> _updateValidator;
     private readonly IValidator<WorkoutFilterDto> _filterValidator;
 
     public WorkoutService(
-        FitnessTrackerContext context,
+        IWorkoutRepository workoutRepository,
         IMapper mapper,
         IValidator<WorkoutCreateDto> createValidator,
         IValidator<WorkoutUpdateDto> updateValidator,
         IValidator<WorkoutFilterDto> filterValidator)
     {
-        _context = context;
+        _workoutRepository = workoutRepository;
         _mapper = mapper;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
         _filterValidator = filterValidator;
     }
 
-    public async Task<WorkoutResponseDto> CreateWorkoutAsync(Guid userId, WorkoutCreateDto createDto)
+    public async Task<WorkoutResponseDto> CreateWorkoutAsync(
+        Guid userId,
+        WorkoutCreateDto createDto,
+        CancellationToken cancellationToken = default)
     {
-        await _createValidator.ValidateAndThrowAsync(createDto);
+        await _createValidator.ValidateAndThrowAsync(createDto, cancellationToken);
 
         var workout = _mapper.Map<Workout>(createDto);
         workout.UserId = userId;
 
-        await _context.Workouts.AddAsync(workout);
-        await _context.SaveChangesAsync();
+        await _workoutRepository.CreateAndSaveAsync(workout, cancellationToken);
 
         return _mapper.Map<WorkoutResponseDto>(workout);
     }
 
-    public async Task<WorkoutResponseDto> GetWorkoutAsync(Guid workoutId, Guid userId)
+    public async Task<WorkoutResponseDto> GetWorkoutAsync(
+        Guid workoutId,
+        Guid userId,
+        CancellationToken cancellationToken = default)
     {
-        var workout = await _context.Workouts
-            .FirstOrDefaultAsync(w => w.Id == workoutId && w.UserId == userId);
+        var workout = await _workoutRepository
+            .FindFirstByConditionAsync(w => w.Id == workoutId && w.UserId == userId, cancellationToken: cancellationToken);
 
         if (workout == null)
         {
@@ -58,11 +64,14 @@ public class WorkoutService : IWorkoutService
         return _mapper.Map<WorkoutResponseDto>(workout);
     }
 
-    public async Task<IEnumerable<WorkoutResponseDto>> GetUserWorkoutsAsync(Guid userId, WorkoutFilterDto filterDto)
+    public async Task<IEnumerable<WorkoutResponseDto>> GetUserWorkoutsAsync(
+        Guid userId,
+        WorkoutFilterDto filterDto,
+        CancellationToken cancellationToken = default)
     {
-        await _filterValidator.ValidateAndThrowAsync(filterDto);
+        await _filterValidator.ValidateAndThrowAsync(filterDto, cancellationToken);
 
-        var query = _context.Workouts
+        var query = _workoutRepository.AsQueryable()
             .Where(w => w.UserId == userId)
             .WhereIf(filterDto.Type.HasValue, w => w.Type == filterDto.Type.Value)
             .WhereIf(filterDto.FromDate.HasValue, w => w.Date >= filterDto.FromDate.Value)
@@ -71,39 +80,64 @@ public class WorkoutService : IWorkoutService
             .WhereIf(filterDto.MaxDuration.HasValue, w => w.Duration <= filterDto.MaxDuration.Value)
             .WhereIf(filterDto.MinCalories.HasValue, w => w.Calories >= filterDto.MinCalories.Value)
             .WhereIf(filterDto.MaxCalories.HasValue, w => w.Calories <= filterDto.MaxCalories.Value)
-            .OrderByField(filterDto.SortBy?.ToLower(), filterDto.SortDescending);
+            .OrderByField(filterDto.SortBy, filterDto.SortDescending ?? false);
 
-        var workouts = await query.ToListAsync();
+        var workouts = await query.ToListAsync(cancellationToken);
         return _mapper.Map<IEnumerable<WorkoutResponseDto>>(workouts);
     }
 
-    public async Task UpdateWorkoutAsync(Guid workoutId, Guid userId, WorkoutUpdateDto updateDto)
+    public async Task UpdateWorkoutAsync(
+        Guid workoutId,
+        Guid userId,
+        WorkoutUpdateDto updateDto,
+        CancellationToken cancellationToken = default)
     {
-        await _updateValidator.ValidateAndThrowAsync(updateDto);
+        await _updateValidator.ValidateAndThrowAsync(updateDto, cancellationToken);
 
-        var workout = await _context.Workouts
-            .FirstOrDefaultAsync(w => w.Id == workoutId && w.UserId == userId);
+        var workout = await _workoutRepository
+            .FindFirstByConditionAsync(w => w.Id == workoutId && w.UserId == userId,
+            trackChanges: true,
+            cancellationToken: cancellationToken);
 
-        if (workout == null)
-        {
-            throw new NotFoundException("Workout not found");
-        }
+        if (workout == null) throw new NotFoundException("Workout not found");
 
         _mapper.Map(updateDto, workout);
-        await _context.SaveChangesAsync();
+        await _workoutRepository.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task DeleteWorkoutAsync(Guid workoutId, Guid userId)
+    public async Task DeleteWorkoutAsync(
+        Guid workoutId,
+        Guid userId,
+        CancellationToken cancellationToken = default)
     {
-        var workout = await _context.Workouts
-            .FirstOrDefaultAsync(w => w.Id == workoutId && w.UserId == userId);
+        var workout = await _workoutRepository
+            .FindFirstByConditionAsync(w => w.Id == workoutId && w.UserId == userId, cancellationToken: cancellationToken);
 
         if (workout == null)
         {
             throw new NotFoundException("Workout not found");
         }
 
-        _context.Workouts.Remove(workout);
-        await _context.SaveChangesAsync();
+        await _workoutRepository.DeleteAndSaveAsync(workout, cancellationToken);
+    }
+
+    public async Task<WorkoutResponseDto> CreateWorkoutFromIntegrationAsync(
+        Guid userId,
+        ExternalWorkoutDto externalWorkoutDto,
+        CancellationToken cancellationToken = default)
+    {
+        var workout = new Workout
+        {
+            UserId = userId,
+            Type = externalWorkoutDto.Type,
+            Duration = externalWorkoutDto.Duration,
+            Calories = externalWorkoutDto.Calories,
+            Distance = externalWorkoutDto.Distance,
+            Date = externalWorkoutDto.StartTime.Date,
+            Notes = externalWorkoutDto.Notes
+        };
+
+        await _workoutRepository.CreateAndSaveAsync(workout, cancellationToken);
+        return _mapper.Map<WorkoutResponseDto>(workout);
     }
 }
