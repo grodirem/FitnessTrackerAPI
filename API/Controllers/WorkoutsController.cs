@@ -9,7 +9,7 @@ namespace API.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/workouts")]
-public class WorkoutsController : Controller
+public class WorkoutsController : ControllerBase
 {
     private IWorkoutService _workoutService;
 

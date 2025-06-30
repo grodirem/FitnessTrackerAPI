@@ -9,7 +9,7 @@ namespace API.Controllers;
 
 [Route("api/auth")]
 [ApiController]
-public class AuthController : Controller
+public class AuthController : ControllerBase
 {
     private IAuthService _authService;
 

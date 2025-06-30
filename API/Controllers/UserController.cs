@@ -9,7 +9,7 @@ namespace API.Controllers;
 [Route("api/users")]
 [ApiController]
 [Authorize]
-public class UserController : Controller
+public class UserController : ControllerBase
 {
     private IUserService _userService;
 
