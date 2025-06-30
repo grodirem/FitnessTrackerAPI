@@ -15,6 +15,7 @@ public class GoalRepository : RepositoryBase<Goal>, IGoalRepository
     {
         return await FindFirstByConditionAsync(
             g => g.UserId == userId && g.Active, 
-            cancellationToken : cancellationToken);
+            trackChanges,
+            cancellationToken);
     }
 }

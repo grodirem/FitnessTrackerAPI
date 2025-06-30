@@ -19,6 +19,5 @@ public class Goal
     public bool Active { get; set; } = true;
 
 
-    public User User { get; set; }
-
+    public required User User { get; set; }
 }

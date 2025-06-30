@@ -19,7 +19,7 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        builder.Services.AddAutoMapper(typeof(AutoMapperProfile));
+        builder.Services.AddAutoMapper(typeof(UserMappings), typeof(WorkoutMappings), typeof(GoalMappings));
         builder.Services.AddDbContext<FitnessTrackerContext>(options => 
             options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
