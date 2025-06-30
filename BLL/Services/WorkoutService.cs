@@ -43,7 +43,8 @@ public class WorkoutService : IWorkoutService
         var workout = _mapper.Map<Workout>(createDto);
         workout.UserId = userId;
 
-        await _workoutRepository.CreateAndSaveAsync(workout, cancellationToken);
+        _workoutRepository.Create(workout);
+        await _workoutRepository.SaveChangesAsync(cancellationToken);
 
         return _mapper.Map<WorkoutResponseDto>(workout);
     }
@@ -53,8 +54,9 @@ public class WorkoutService : IWorkoutService
         Guid userId,
         CancellationToken cancellationToken = default)
     {
-        var workout = await _workoutRepository
-            .FindFirstByConditionAsync(w => w.Id == workoutId && w.UserId == userId, cancellationToken: cancellationToken);
+        var workout = await _workoutRepository.FindFirstByConditionAsync(
+            w => w.Id == workoutId && w.UserId == userId, 
+            cancellationToken: cancellationToken);
 
         if (workout == null)
         {
@@ -73,13 +75,13 @@ public class WorkoutService : IWorkoutService
 
         var query = _workoutRepository.AsQueryable()
             .Where(w => w.UserId == userId)
-            .WhereIf(filterDto.Type.HasValue, w => w.Type == filterDto.Type.Value)
-            .WhereIf(filterDto.FromDate.HasValue, w => w.Date >= filterDto.FromDate.Value)
-            .WhereIf(filterDto.ToDate.HasValue, w => w.Date <= filterDto.ToDate.Value)
-            .WhereIf(filterDto.MinDuration.HasValue, w => w.Duration >= filterDto.MinDuration.Value)
-            .WhereIf(filterDto.MaxDuration.HasValue, w => w.Duration <= filterDto.MaxDuration.Value)
-            .WhereIf(filterDto.MinCalories.HasValue, w => w.Calories >= filterDto.MinCalories.Value)
-            .WhereIf(filterDto.MaxCalories.HasValue, w => w.Calories <= filterDto.MaxCalories.Value)
+            .WhereIf(filterDto.Type.HasValue, w => w.Type == filterDto.Type.GetValueOrDefault())
+            .WhereIf(filterDto.FromDate.HasValue, w => w.Date >= filterDto.FromDate.GetValueOrDefault())
+            .WhereIf(filterDto.ToDate.HasValue, w => w.Date <= filterDto.ToDate.GetValueOrDefault())
+            .WhereIf(filterDto.MinDuration.HasValue, w => w.Duration >= filterDto.MinDuration.GetValueOrDefault())
+            .WhereIf(filterDto.MaxDuration.HasValue, w => w.Duration <= filterDto.MaxDuration.GetValueOrDefault())
+            .WhereIf(filterDto.MinCalories.HasValue, w => w.Calories >= filterDto.MinCalories.GetValueOrDefault())
+            .WhereIf(filterDto.MaxCalories.HasValue, w => w.Calories <= filterDto.MaxCalories.GetValueOrDefault())
             .OrderByField(filterDto.SortBy, filterDto.SortDescending ?? false);
 
         var workouts = await query.ToListAsync(cancellationToken);
@@ -94,12 +96,15 @@ public class WorkoutService : IWorkoutService
     {
         await _updateValidator.ValidateAndThrowAsync(updateDto, cancellationToken);
 
-        var workout = await _workoutRepository
-            .FindFirstByConditionAsync(w => w.Id == workoutId && w.UserId == userId,
+        var workout = await _workoutRepository.FindFirstByConditionAsync(
+            w => w.Id == workoutId && w.UserId == userId,
             trackChanges: true,
-            cancellationToken: cancellationToken);
+            cancellationToken);
 
-        if (workout == null) throw new NotFoundException("Workout not found");
+        if (workout == null)
+        {
+            throw new NotFoundException("Workout not found");
+        }
 
         _mapper.Map(updateDto, workout);
         await _workoutRepository.SaveChangesAsync(cancellationToken);
@@ -110,15 +115,17 @@ public class WorkoutService : IWorkoutService
         Guid userId,
         CancellationToken cancellationToken = default)
     {
-        var workout = await _workoutRepository
-            .FindFirstByConditionAsync(w => w.Id == workoutId && w.UserId == userId, cancellationToken: cancellationToken);
+        var workout = await _workoutRepository.FindFirstByConditionAsync(
+            w => w.Id == workoutId && w.UserId == userId, 
+            cancellationToken: cancellationToken);
 
         if (workout == null)
         {
             throw new NotFoundException("Workout not found");
         }
 
-        await _workoutRepository.DeleteAndSaveAsync(workout, cancellationToken);
+        _workoutRepository.Delete(workout);
+        await _workoutRepository.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<WorkoutResponseDto> CreateWorkoutFromIntegrationAsync(
@@ -126,18 +133,12 @@ public class WorkoutService : IWorkoutService
         ExternalWorkoutDto externalWorkoutDto,
         CancellationToken cancellationToken = default)
     {
-        var workout = new Workout
-        {
-            UserId = userId,
-            Type = externalWorkoutDto.Type,
-            Duration = externalWorkoutDto.Duration,
-            Calories = externalWorkoutDto.Calories,
-            Distance = externalWorkoutDto.Distance,
-            Date = externalWorkoutDto.StartTime.Date,
-            Notes = externalWorkoutDto.Notes
-        };
+        var workout = _mapper.Map<Workout>(externalWorkoutDto);
+        workout.UserId = userId;
 
-        await _workoutRepository.CreateAndSaveAsync(workout, cancellationToken);
+        _workoutRepository.Create(workout);
+        await _workoutRepository.SaveChangesAsync(cancellationToken);
+
         return _mapper.Map<WorkoutResponseDto>(workout);
     }
 }

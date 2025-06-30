@@ -38,7 +38,7 @@ public class ExceptionHandlingMiddleware
     {
         var (statusCode, message) = GetStatusCodeAndMessage(exception);
 
-        _logger.LogError(exception, "Ошибка обработки запроса: {Message}", exception.Message);
+        _logger.LogError(exception, "Request processing error: {Message}", exception.Message);
 
         context.Response.ContentType = "application/json";
         context.Response.StatusCode = (int)statusCode;
@@ -60,12 +60,15 @@ public class ExceptionHandlingMiddleware
 
     private (HttpStatusCode statusCode, string message) GetStatusCodeAndMessage(Exception exception)
     {
+        _logger.LogDebug("Handling exception of type {ExceptionType}", exception.GetType().Name);
+
         return exception switch
         {
-            ValidationException => (HttpStatusCode.BadRequest, exception.Message),
-            NotFoundException => (HttpStatusCode.NotFound, exception.Message),
-            UnauthorizedException => (HttpStatusCode.Unauthorized, exception.Message),
-            ConflictException => (HttpStatusCode.Conflict, exception.Message),
+            ValidationException => (HttpStatusCode.BadRequest, "Validation error: " + exception.Message),
+            NotFoundException => (HttpStatusCode.NotFound, "Resource not found: " + exception.Message),
+            UnauthorizedException => (HttpStatusCode.Unauthorized, "Authorization failed: " + exception.Message),
+            ConflictException => (HttpStatusCode.Conflict, "Conflict detected: " + exception.Message),
+            InvalidOperationException => (HttpStatusCode.BadRequest, "Invalid operation: " + exception.Message),
         };
     }
 }

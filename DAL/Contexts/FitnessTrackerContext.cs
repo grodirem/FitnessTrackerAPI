@@ -10,8 +10,8 @@ public class FitnessTrackerContext : IdentityDbContext<User, IdentityRole<Guid>,
     public FitnessTrackerContext(DbContextOptions<FitnessTrackerContext> options)
         : base(options) { }
 
-    public DbSet<Workout> Workouts { get; set; }
-    public DbSet<Goal> Goals { get; set; }
+    public required DbSet<Workout> Workouts { get; set; }
+    public required DbSet<Goal> Goals { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

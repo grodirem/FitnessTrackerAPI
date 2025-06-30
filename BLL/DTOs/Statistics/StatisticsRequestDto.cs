@@ -1,6 +1,4 @@
-﻿using Common.Enums;
-
-namespace BLL.DTOs.Statistics;
+﻿namespace BLL.DTOs.Statistics;
 
 public class StatisticsRequestDto
 {

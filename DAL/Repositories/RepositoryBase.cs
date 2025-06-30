@@ -46,24 +46,6 @@ public abstract class RepositoryBase<T> : IRepositoryBase<T> where T : class
     public void Create(T entity) => _context.Set<T>().Add(entity);
     public void Update(T entity) => _context.Set<T>().Update(entity);
     public void Delete(T entity) => _context.Set<T>().Remove(entity);
-
-    public async Task CreateAndSaveAsync(T entity, CancellationToken cancellationToken = default)
-    {
-        Create(entity);
-        await SaveChangesAsync(cancellationToken);
-    }
-    public async Task UpdateAndSaveAsync(T entity, CancellationToken cancellationToken = default)
-    {
-        Update(entity);
-        await SaveChangesAsync(cancellationToken);
-    }
-
-    public async Task DeleteAndSaveAsync(T entity, CancellationToken cancellationToken = default)
-    {
-        Delete(entity);
-        await SaveChangesAsync(cancellationToken);
-    }
-
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
         => await _context.SaveChangesAsync(cancellationToken);
 }

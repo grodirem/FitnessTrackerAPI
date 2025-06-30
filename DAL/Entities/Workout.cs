@@ -29,8 +29,8 @@ public class Workout
     [Required]
     public DateTime Date { get; set; }
 
-    public string Notes { get; set; }
+    public string? Notes { get; set; }
 
 
-    public User User { get; set; }
+    public required User User { get; set; }
 }

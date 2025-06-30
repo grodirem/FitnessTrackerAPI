@@ -22,9 +22,5 @@ public interface IRepositoryBase<T> where T : class
     void Update(T entity);
     void Delete(T entity);
 
-    Task CreateAndSaveAsync(T entity, CancellationToken cancellationToken = default);
-    Task UpdateAndSaveAsync(T entity, CancellationToken cancellationToken = default);
-    Task DeleteAndSaveAsync(T entity, CancellationToken cancellationToken = default);
-
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }
